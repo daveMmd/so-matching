@@ -19,7 +19,7 @@ void parse_arguments(int argc, char** argv){
     std::cout << "Hello, Shift-or matching!" << std::endl;
     if(argc < 3) {
         //../../rule-database/clamav-sigs/main.ndb 1000
-        printf("usage: %s -p <pattern-file> -n <pattern-number> -f <format> -t <trace-file>\n", argv[0]);
+        printf("usage: %s -p <pattern-file> -n <pattern-number> -f <format> -g <grouping-method:1,2,3> -t <trace-file>\n", argv[0]);
         exit(-1);
     }
     while((opt = getopt(argc, argv, "g:p:n:f:t:")) != -1){
@@ -63,7 +63,8 @@ int main(int argc, char** argv) {
     struct timeval begin, end;
 
     parse_arguments(argc, argv);
-    if(command.rule_format == nullptr || strcmp(command.rule_format, "clamav") == 0) patterns = read_patterns_from_clamav_ndb(command.pattern_file, command.max_pattern_num);
+    //if(command.rule_format == nullptr || strcmp(command.rule_format, "clamav") == 0) patterns = read_patterns_from_clamav_ndb(command.pattern_file, command.max_pattern_num);
+    if(strcmp(command.rule_format, "clamav") == 0) patterns = read_patterns_from_clamav_ndb(command.pattern_file, command.max_pattern_num);
     else if(strcmp(command.rule_format, "hyperscan") == 0) patterns = read_patterns_from_hyperscan_hex(command.pattern_file, command.max_pattern_num);
     else patterns = read_patterns_from_plaintext(command.pattern_file, command.max_pattern_num);
 
@@ -75,12 +76,15 @@ int main(int argc, char** argv) {
 
     //matching_engine->debug();
 
-    matching_engine->filtering_effectiveness();
+    //matching_engine->filtering_effectiveness();
 
     //matching_engine->show_duplicate_patterns_in_same_bucket();
 
+    matching_engine->output_mif();
+
     if(command.traffic_file){
-        string* T = read_traffic_from_pcap(command.traffic_file);
+        //string* T = read_traffic_from_pcap(command.traffic_file);
+        string* T = read_text_from_file(command.traffic_file);
         matching_engine->match(T);
     }
 

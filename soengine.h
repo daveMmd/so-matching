@@ -14,12 +14,12 @@ using namespace std;
 
 /*DEBUG FLAG*/
 #define DEBUG_MATCHING_CASES 0
-#define PATTERN_GROUPING 1 //2：局部搜索划分；1:用hypersan的动态规划方法划分规则集； 0:平均划分；
+#define PATTERN_GROUPING 3 //3: pigasus 方法; 2：局部搜索划分；1:用hypersan的动态规划方法划分规则集； 0:平均划分；
 
-//#define SUPER_BIT_NUM 4
-#define SUPER_BIT_NUM 2
-//#define BUCKET_NUM 8
-#define BUCKET_NUM 32
+#define SUPER_BIT_NUM 5//4
+//#define SUPER_BIT_NUM 2
+#define BUCKET_NUM 8
+//#define BUCKET_NUM 32
 #define MAX_PATTERN_LENGTH 8
 #define CUT_DIRECTION 1 //1为反向，0为正向
 
@@ -31,6 +31,7 @@ class soengine {
     //shift-or mask for each character
     shiftor_mask_t shiftorMasks[1 << (8 + SUPER_BIT_NUM)];
     vector<string> patterns_in_each_bucket[BUCKET_NUM];
+    int bucket_pattern_length[BUCKET_NUM];
 
 public:
     explicit soengine(list<string>*, int groping_method = 0);
@@ -41,6 +42,8 @@ public:
     void match(string *);
 
     void debug();
+
+    void output_mif();
 
     void show_duplicate_patterns_in_same_bucket();
 

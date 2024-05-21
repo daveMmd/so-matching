@@ -13,4 +13,5 @@ list<string>* read_patterns_from_clamav_ndb(char* fname, int max_pattern_num);
 list<string>* read_patterns_from_plaintext(char* fname, int max_pattern_num);
 list<string>* read_patterns_from_hyperscan_hex(char* fname, int max_pattern_num);
 string* read_traffic_from_pcap(char* fname);
+string* read_text_from_file(char* fname);
 #endif //SO_MATCHING_UTIL_H

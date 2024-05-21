@@ -2,8 +2,10 @@
 // Created by 钟金诚 on 2021/3/2.
 //
 #include "util.h"
+#include <string.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 /*check if all chars are hex digits*/
 bool is_exact_string(string &pattern){
@@ -162,4 +164,37 @@ string* read_traffic_from_pcap(char* fname){
 
     printf("input traffic size: %lu\n", T->size());
     return T;
+}
+
+bool isFileType(const char* fname, const std::string& extension) {
+    std::string filename(fname);
+    if (filename.length() >= extension.length()) {
+        return (0 == filename.compare(filename.length() - extension.length(), extension.length(), extension));
+    }
+    return false;
+}
+
+string* read_traffic_from_txt(char* fname){
+    std::ifstream file(fname);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << fname << std::endl;
+        return nullptr;
+    }
+
+    std::ostringstream buffer;
+    buffer << file.rdbuf(); // 读取文件内容到 buffer
+    return new std::string(buffer.str()); // 动态分配 std::string 并返回指针
+}
+
+string* read_text_from_file(char* fname){
+    if(isFileType(fname, ".pcap")){
+        return read_traffic_from_pcap(fname);
+    }
+    else if(isFileType(fname, ".txt")){
+        return read_traffic_from_txt(fname);
+    }
+    else{
+        fprintf(stderr, "traffic file type not match!\n");
+        return nullptr;
+    }
 }

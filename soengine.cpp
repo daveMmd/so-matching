@@ -5,9 +5,13 @@
 #include "soengine.h"
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <algorithm>
+#include <cassert>
 
 bool lengthcmp(string &s1, string &s2){
-    return s1.size() > s2.size();
+    return s1.size() < s2.size();
 }
 
 bool double_equal(double a, double b){
@@ -25,6 +29,9 @@ void pattern_grouping(vector<string> *patterns, vector<string>* patterns_in_each
 
     //initialization
     int s = patterns->size();
+    int tmp0 = vec_patterns[0].size();
+    int tmp1 = vec_patterns[s-1].size();
+
     auto **t = (double**) malloc(sizeof(double*) * s);
     for(int i = 0; i < s; i++)
         t[i] = (double *) malloc(sizeof(double) * BUCKET_NUM);
@@ -99,6 +106,34 @@ void my_grouping(vector<string> *patterns, vector<string>* patterns_in_each_buck
             patterns_in_each_bucket[i].push_back(v_patterns[start_index + j]);
         }
         start_index += ave;
+    }
+}
+
+//Pigasus fixed-length grouping:
+//pigasus first-filter state 初始值为[63:0] : 0000000000000011000001110000111100011111001111110111111111111111
+//-> pigasus 每个bucket长度为固定的: 2, 3, 4, 5, 6, 7, 8, 8
+void pigasus_grouping(vector<string> *patterns, vector<string>* patterns_in_each_bucket, int* bucket_pattern_length){
+    bucket_pattern_length[0] = 2;
+    bucket_pattern_length[1] = 3;
+    bucket_pattern_length[2] = 4;
+    bucket_pattern_length[3] = 5;
+    bucket_pattern_length[4] = 6;
+    bucket_pattern_length[5] = 7;
+    bucket_pattern_length[6] = 8;
+    bucket_pattern_length[7] = 8;
+    int cnt_len8 = 0;
+    for(const auto& pattern :*patterns){
+        auto pattern_len = pattern.size();
+        assert(pattern_len >= 2 && pattern_len <= 8);
+        if(pattern_len < 8){
+            auto bucket_choose = pattern_len - 2;
+            patterns_in_each_bucket[bucket_choose].push_back(pattern);
+        }
+        else{//pattern_len == 8
+            //average place to bucket 6,7
+            auto bucket_choose = 6 + (cnt_len8++) % 2;
+            patterns_in_each_bucket[bucket_choose].push_back(pattern);
+        }
     }
 }
 
@@ -186,6 +221,7 @@ double  calculate_pmatching_add(vector<string>* patterns_in_each_bucket, int buc
 void localsearch_grouping(vector<string> *patterns, vector<string>* patterns_in_each_bucket){
     vector<string> v_patterns = *patterns;
 
+#if 0
     /*1.randomly partition patterns into each group*/
     int ave = patterns->size() / BUCKET_NUM;
     int start_index = 0;
@@ -197,19 +233,54 @@ void localsearch_grouping(vector<string> *patterns, vector<string>* patterns_in_
     }
     //left push into bucket 1
     for(; start_index < patterns->size(); start_index++) patterns_in_each_bucket[0].push_back(v_patterns[start_index]);
+#elif 0
+    /*1.patterns in the same length are partitioned into one group*/
+    for(auto pattern : v_patterns){
+        int length = pattern.size();
+        patterns_in_each_bucket[length - 1].push_back(pattern);
+    }
+#elif 0
+    /*1.patterns in the same length are partitioned into one group. No empty group*/
+    sort(v_patterns.begin(), v_patterns.end(), lengthcmp);
+    int cur_bucket_id = 0;
+    int consec = 1;
+    patterns_in_each_bucket[cur_bucket_id].push_back(v_patterns[0]);
+    for(int i = 1; i < v_patterns.size(); i++){
+        if(v_patterns[i].size() != v_patterns[i-1].size()){
+            cur_bucket_id++;
+            consec = 1;
+        }
+        else if(consec > v_patterns.size() / 8){
+            cur_bucket_id++;
+            consec = 1;
+        }
+        else consec++;
 
+        patterns_in_each_bucket[cur_bucket_id].push_back(v_patterns[i]);
+    }
+#else
+    //first use the intial grouping method
+    pattern_grouping(patterns, patterns_in_each_bucket);
+#endif
     /*local search local-optimal solution*/
     int best_cnt = 0;
-    int max_best =  patterns->size();
-    if(max_best > 1000) max_best = 1000;
+    int max_best = patterns->size();
+    int max_iter = patterns->size();
+#define T1 100
+#define T2 20000
+    if(max_best > T1) max_best = T1;
+    if(max_iter > T2) max_iter = T2;
+    //max_iter = 16000;
     int iter_cnt = 0;
     while(1){
         if(iter_cnt % 100 == 0) printf("Iteration %d ...\n", iter_cnt);
-        iter_cnt++;
         //randomly choose one pattern
         int choose_bucket = rand() % BUCKET_NUM;
+        if(!patterns_in_each_bucket[choose_bucket].size()) continue;
         int pattern_id = rand() % patterns_in_each_bucket[choose_bucket].size();
         string pattern = patterns_in_each_bucket[choose_bucket][pattern_id];
+        iter_cnt++;
+        if(iter_cnt > max_iter) break;
 
         //calculate the postiveness (reduced matching possibility)
         double p1 = calculate_pmatching_reduce(patterns_in_each_bucket, choose_bucket, pattern_id);
@@ -231,6 +302,7 @@ void localsearch_grouping(vector<string> *patterns, vector<string>* patterns_in_
             best_cnt++;
             if(best_cnt > max_best) break;
         }
+        else best_cnt = 0;
     }
 }
 
@@ -260,7 +332,8 @@ void soengine::generate_shiftor_mask(){
         //"padding byte": set bit 0 if byte position of sh-or-mask exceeds the longest pattern
         for(int c=0; c < (1 << (8 + SUPER_BIT_NUM)); c++){
             for(int toleft_offset = pattern_length; toleft_offset < MAX_PATTERN_LENGTH; toleft_offset++){
-                shiftorMasks[c][toleft_offset * BUCKET_NUM + bucket] = 0;
+                //shiftorMasks[c][toleft_offset * BUCKET_NUM + bucket] = 0;
+                shiftorMasks[c][toleft_offset * BUCKET_NUM + ( 7 - bucket)] = 0;
             }
         }
 
@@ -273,14 +346,16 @@ void soengine::generate_shiftor_mask(){
                     for(int fillend = 0; fillend < (1 << SUPER_BIT_NUM); fillend++){
                         int index = (c << SUPER_BIT_NUM)  + fillend;
                         //shiftorMasks[index][(MAX_PATTERN_LENGTH - toleft_offset - 1) * BUCKET_NUM + (BUCKET_NUM - bucket)] = 1;
-                        shiftorMasks[index][toleft_offset * BUCKET_NUM + bucket] = 0;
+                        //shiftorMasks[index][toleft_offset * BUCKET_NUM + bucket] = 0;
+                        shiftorMasks[index][toleft_offset * BUCKET_NUM + (7 - bucket)] = 0;
                     }
                 }
                 else{//set one bit 0
                     unsigned char next_c = patterns_in_each_bucket[bucket][i][pattern_length - 1 - toleft_offset + 1];
                     int index = (c << SUPER_BIT_NUM) + next_c % (1 << SUPER_BIT_NUM);
                     //shiftorMasks[index][(MAX_PATTERN_LENGTH - toleft_offset - 1) * BUCKET_NUM + (BUCKET_NUM - bucket)] = 1;
-                    shiftorMasks[index][toleft_offset * BUCKET_NUM + bucket] = 0;
+                    //shiftorMasks[index][toleft_offset * BUCKET_NUM + bucket] = 0;
+                    shiftorMasks[index][toleft_offset * BUCKET_NUM + (7 - bucket)] = 0;
                 }
             }
         }
@@ -303,6 +378,11 @@ soengine::soengine(list<string> *patterns, int grouping_method) {
     else if(grouping_method == 2) {
         printf("Using local-search grouping\n");
         localsearch_grouping(cut_patterns, patterns_in_each_bucket);
+    }
+    else if(grouping_method == 3){
+        printf("Using Pigasus fixed-length grouping method!\n");
+        //todo
+        pigasus_grouping(cut_patterns, patterns_in_each_bucket, bucket_pattern_length);
     }
     else{
         printf("wrong grouping method!\n");
@@ -336,6 +416,9 @@ double soengine::filtering_effectiveness() {
         int pattern_num = patterns.size();
         if(pattern_num <= 0) continue;
         int pattern_length = patterns[0].size();
+        for(int i = 1; i < pattern_num; i++){
+            if(patterns[i].size() < pattern_length) pattern_length = patterns[i].size();
+        }
 
         //case_num[depth][char] 表示深度为depth时末尾字符为c的可能路径数。depth(从左往右数)
         uint64_t **case_num = (uint64_t **) malloc(sizeof(uint64_t *) * pattern_length);
@@ -430,21 +513,31 @@ void soengine::show_duplicate_patterns_in_same_bucket() {
 }
 
 
-#define MATCH_DEBUG 0
+#define MATCH_DEBUG 2
 void soengine::match(string *T) {
     /*初始化state-mask*/
     bitset<2 * MAX_PATTERN_LENGTH * BUCKET_NUM> state_mask;
     state_mask.reset(); //state-mask 所有位置为0
     //每一个bucket，小于pattern-length的位置置为1，避免误匹配
+    //pigasus first-filter state 初始值为[63:0] : 0000000000000011000001110000111100011111001111110111111111111111
+    //-> pigasus 每个bucket长度为固定的: 2, 3, 4, 5, 6, 7, 8, 8
     for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
-        if(patterns_in_each_bucket[bucket].size() < 1) continue;
-        int pattern_length = patterns_in_each_bucket[bucket][0].size();
+        int pattern_length;
+        if(patterns_in_each_bucket[bucket].size() < 1) {
+            //continue;
+            pattern_length = bucket_pattern_length[bucket];
+        }
+        else pattern_length = patterns_in_each_bucket[bucket][0].size();
+
         for(int length = 0; length < pattern_length - 1; length++){
-            //state_mask[(2 * MAX_PATTERN_LENGTH - length) * BUCKET_NUM - bucket - 1] = 1;
-            state_mask[length * BUCKET_NUM + bucket] = 1;
+            //state_mask[length * BUCKET_NUM + bucket] = 1;
+            state_mask[length * BUCKET_NUM + (BUCKET_NUM - 1 - bucket)] = 1;
         }
     }
-    if(MATCH_DEBUG) std::cout << "stt_mask: " << state_mask.to_string() << endl;
+
+    //print:    0000000000000011000001110000111100011111001111110111111111111111
+    //stt-mask: 0000000000000011000001110000111100011111001111110111111111111111
+    if(MATCH_DEBUG <= 2) std::cout << "init stt_mask: " << state_mask.to_string() << endl;
 
     string Text = *T;
     int match_num = 0;
@@ -468,21 +561,21 @@ void soengine::match(string *T) {
             }
             so_masks[i] = so_masks[i] << (i * BUCKET_NUM);
 
-            if(MATCH_DEBUG) std::cout << "so_mask" << i << ": " << so_masks[i].to_string() << endl;
+            if(MATCH_DEBUG <= 1) std::cout << "so_mask" << i << ": " << so_masks[i].to_string() << endl;
         }
 
         //shift-or运算
         for(int i = 0; i < MAX_PATTERN_LENGTH; i++){
             state_mask |= so_masks[i];
         }
-        if(MATCH_DEBUG) std::cout << "state_mask: " << state_mask.to_string() << endl;
+        if(MATCH_DEBUG <= 1) std::cout << "state_mask: " << state_mask.to_string() << endl;
 
         //检测是否存在匹配:小于MAX_PATTERN_LENGTH的位置是否存在0 bit
         for(int length = 0; length < MAX_PATTERN_LENGTH; length++){
             bool match_flag = false;
             for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
                 if(state_mask[length * BUCKET_NUM + bucket] == 0){
-                    if(MATCH_DEBUG) printf("position %d match patterns in bucket %d\n", pos + length, bucket);
+                    if(MATCH_DEBUG <= 2) printf("position %d match patterns in bucket %d\n", pos + length, (7 - bucket));
                     match_num++;
                     if(!match_flag){
                         match_num_each_length++;
@@ -513,24 +606,56 @@ void soengine::match(string *T) {
         }
         so_masks[i] = so_masks[i] << (i * BUCKET_NUM);
 
-        if(MATCH_DEBUG) std::cout << "so_mask" << i << ": " << so_masks[i].to_string() << endl;
+        if(MATCH_DEBUG <= 1) std::cout << "so_mask" << i << ": " << so_masks[i].to_string() << endl;
     }
 
     //shift-or运算
     for(int i = 0; i < left_length; i++){
         state_mask |= so_masks[i];
     }
-    if(MATCH_DEBUG) std::cout << "stt_mask: " << state_mask.to_string() << endl;
+    if(MATCH_DEBUG <= 1) std::cout << "stt_mask: " << state_mask.to_string() << endl;
 
     //检测是否存在匹配:小于MAX_PATTERN_LENGTH的位置是否存在0 bit
     for(int length = 0; length < left_length; length++){
         for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
             if(state_mask[length * BUCKET_NUM + bucket] == 0){
-                if(MATCH_DEBUG) printf("position %d match patterns in bucket %d\n", pos + length, bucket);
+                //if(MATCH_DEBUG <= 2) printf("position %d match patterns in bucket %d\n", pos + length, bucket);
+                if(MATCH_DEBUG <= 2) printf("position %d match patterns in bucket %d\n", pos + length, (7 - bucket));
             }
         }
     }
 
     //report
     printf("match_num:%d\nmatch_num_each_length:%d\n", match_num, match_num_each_length);
+}
+
+void soengine::output_mif() {
+    // 将数组写入 .mif 文件的函数
+    string filename = "./shift_or_mask.mif";
+    std::ofstream mifFile(filename);
+    if (!mifFile.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+    // 写入 MIF 文件头
+    mifFile << "WIDTH=64;\n";
+    mifFile << "DEPTH=" << (1<<(8 + SUPER_BIT_NUM)) << ";\n\n";
+    mifFile << "ADDRESS_RADIX=HEX;\n";
+    mifFile << "DATA_RADIX=HEX;\n\n";
+    mifFile << "CONTENT BEGIN\n";
+
+    // 写入数组内容
+    //cout << "debug" << shiftorMasks[0].to_string() << endl;
+    //cout << "debug" << shiftorMasks[0].to_ullong() << endl;
+
+    for (size_t i = 0; i < (1<<(8 + SUPER_BIT_NUM)); ++i) {
+        mifFile << "    " << std::setw(4) << std::setfill('0') << std::hex << i << " : "
+                << std::setw(2) << std::setfill('0') << std::hex << shiftorMasks[i].to_ullong() << ";\n";
+    }
+
+    mifFile << "END;\n";
+
+    mifFile.close();
+    std::cout << "MIF file written successfully to " << filename << std::endl;
 }
