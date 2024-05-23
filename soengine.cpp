@@ -338,24 +338,27 @@ void soengine::generate_shiftor_mask(){
         }
 
         //iterate each offset
-        for(int toleft_offset = 0; toleft_offset < pattern_length; toleft_offset++){
+        for(int toright_offset = 0; toright_offset < pattern_length; toright_offset++){
             //iterate each pattern
             for(int i=0; i<patterns_in_each_bucket[bucket].size(); i++){
-                unsigned char c = patterns_in_each_bucket[bucket][i][pattern_length - 1 - toleft_offset];
-                if(toleft_offset == 0){//set (1<<SUPER_BIT_NUM) bits 0
+                unsigned char c = patterns_in_each_bucket[bucket][i][pattern_length - 1 - toright_offset];
+                if(toright_offset == 0){//set (1<<SUPER_BIT_NUM) bits 0
+                //if((toleft_offset + 1) == pattern_length){//set (1<<SUPER_BIT_NUM) bits 0
                     for(int fillend = 0; fillend < (1 << SUPER_BIT_NUM); fillend++){
-                        int index = (c << SUPER_BIT_NUM)  + fillend;
-                        //shiftorMasks[index][(MAX_PATTERN_LENGTH - toleft_offset - 1) * BUCKET_NUM + (BUCKET_NUM - bucket)] = 1;
+                        //int index = (c << SUPER_BIT_NUM)  + fillend;
+                        int index = (fillend << 8) + c;
+                        //printf("building, (padding) index : 0x%x\n", index);
                         //shiftorMasks[index][toleft_offset * BUCKET_NUM + bucket] = 0;
-                        shiftorMasks[index][toleft_offset * BUCKET_NUM + (7 - bucket)] = 0;
+                        shiftorMasks[index][toright_offset * BUCKET_NUM + (7 - bucket)] = 0;
                     }
                 }
                 else{//set one bit 0
-                    unsigned char next_c = patterns_in_each_bucket[bucket][i][pattern_length - 1 - toleft_offset + 1];
-                    int index = (c << SUPER_BIT_NUM) + next_c % (1 << SUPER_BIT_NUM);
-                    //shiftorMasks[index][(MAX_PATTERN_LENGTH - toleft_offset - 1) * BUCKET_NUM + (BUCKET_NUM - bucket)] = 1;
+                    unsigned char next_c = patterns_in_each_bucket[bucket][i][pattern_length - 1 - toright_offset + 1];
+                    //int index = (c << SUPER_BIT_NUM) + next_c % (1 << SUPER_BIT_NUM);
+                    int index = ((next_c % (1 << SUPER_BIT_NUM)) << 8) + c;
+                    printf("building, index : 0x%x\n", index);
                     //shiftorMasks[index][toleft_offset * BUCKET_NUM + bucket] = 0;
-                    shiftorMasks[index][toleft_offset * BUCKET_NUM + (7 - bucket)] = 0;
+                    shiftorMasks[index][toright_offset * BUCKET_NUM + (7 - bucket)] = 0;
                 }
             }
         }
@@ -391,6 +394,8 @@ soengine::soengine(list<string> *patterns, int grouping_method) {
 
     //generate shift-or masks for each character
     generate_shiftor_mask();
+
+    generate_bitmap();
 }
 
 void soengine::debug() {
@@ -513,7 +518,7 @@ void soengine::show_duplicate_patterns_in_same_bucket() {
 }
 
 
-#define MATCH_DEBUG 2
+#define MATCH_DEBUG 1
 void soengine::match(string *T) {
     /*初始化state-mask*/
     bitset<2 * MAX_PATTERN_LENGTH * BUCKET_NUM> state_mask;
@@ -551,8 +556,10 @@ void soengine::match(string *T) {
         for(int i = 0; i < MAX_PATTERN_LENGTH; i++){
             unsigned char c1 = Text[pos + i];
             unsigned char c2 = Text[pos + i + 1]; //可能超出边界
-            int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
+            //int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
+            int index = ((c2 % (1 << SUPER_BIT_NUM)) << 8) + c1;
             so_masks[i].reset(); //初始化为全0
+            cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
             //so_masks[i] = shiftorMasks[index];
             for(int length = 0; length < MAX_PATTERN_LENGTH; length++){
                 for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
@@ -596,7 +603,8 @@ void soengine::match(string *T) {
     for(int i = 0; i < left_length; i++){
         unsigned char c1 = Text[pos + i];
         unsigned char c2 = Text[pos + i + 1]; //可能超出边界
-        int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
+        //int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
+        int index = ((c2 % (1 << SUPER_BIT_NUM)) << 8) + c1;
         so_masks[i].reset(); //初始化为全0
         //so_masks[i] = shiftorMasks[index];
         for(int length = 0; length < MAX_PATTERN_LENGTH; length++){
@@ -617,10 +625,16 @@ void soengine::match(string *T) {
 
     //检测是否存在匹配:小于MAX_PATTERN_LENGTH的位置是否存在0 bit
     for(int length = 0; length < left_length; length++){
+        bool match_flag = false;
         for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
             if(state_mask[length * BUCKET_NUM + bucket] == 0){
                 //if(MATCH_DEBUG <= 2) printf("position %d match patterns in bucket %d\n", pos + length, bucket);
                 if(MATCH_DEBUG <= 2) printf("position %d match patterns in bucket %d\n", pos + length, (7 - bucket));
+                match_num++;
+                if(!match_flag){
+                    match_num_each_length++;
+                    match_flag = true;
+                }
             }
         }
     }
@@ -630,8 +644,12 @@ void soengine::match(string *T) {
 }
 
 void soengine::output_mif() {
+    //call 8 hashtable_bitmap
+    for(int bucket = 0; bucket < BUCKET_NUM; bucket++)
+        hashtable_bitmap_eachbucket[bucket]->output_mif("bitmap" + std::to_string(bucket) + ".mif");
+
     // 将数组写入 .mif 文件的函数
-    string filename = "./shift_or_mask.mif";
+    string filename = "./match_table.mif";
     std::ofstream mifFile(filename);
     if (!mifFile.is_open()) {
         std::cerr << "Failed to open file: " << filename << std::endl;
@@ -658,4 +676,39 @@ void soengine::output_mif() {
 
     mifFile.close();
     std::cout << "MIF file written successfully to " << filename << std::endl;
+}
+
+void soengine::generate_bitmap() {
+    for(auto bucket = 0; bucket < BUCKET_NUM; bucket++){
+        //how many bytes should be masked when hashing
+        int lsb_bytes_masked = (8 - bucket_pattern_length[7- bucket]);
+        if(bucket < 2) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(15, 16, 4096, lsb_bytes_masked);
+        else if(bucket < 4) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(12, 16, 512, lsb_bytes_masked);
+        else if(bucket == 4) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(11, 16, 256, lsb_bytes_masked);
+        else if(bucket == 5) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(12, 16, 512, lsb_bytes_masked);
+        else if(bucket == 6) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(10, 16, 128, lsb_bytes_masked);
+        else if(bucket == 7) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(8, 16, 32, lsb_bytes_masked);
+    }
+
+    for(auto bucket = 0; bucket < BUCKET_NUM; bucket++){
+        hashtable_bitmap_eachbucket[bucket]->build(patterns_in_each_bucket[7 - bucket]);
+    }
+}
+
+void soengine::co_match(string *T){
+    match(T); //shift-or
+
+    //hash_bitmap match
+    for(int i = 0; i < T->size(); i++){
+        int start_pos = (i >= 7) ? i - 7 : 0;
+        int char_n = (i >= 7) ? 8 : (i + 1);
+        string sub_str = T->substr(start_pos, char_n);
+        for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
+            bool if_match = hashtable_bitmap_eachbucket[bucket]->lookup(sub_str);
+            if(if_match){
+                printf("Pigasus-hash-bitmap (bucket %d) matched at pos: %d\n", (7 - bucket), i);
+            }
+        }
+    }
+
 }

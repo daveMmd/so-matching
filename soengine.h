@@ -10,6 +10,7 @@
 #include <string>
 #include <bitset>
 #include <vector>
+#include "pigasus_hash_bitmap.h"
 using namespace std;
 
 /*DEBUG FLAG*/
@@ -28,18 +29,24 @@ typedef bitset<MAX_PATTERN_LENGTH * BUCKET_NUM> shiftor_mask_t;
 typedef bitset<2 * MAX_PATTERN_LENGTH * BUCKET_NUM> so_mask_t;//用于匹配过程中
 
 class soengine {
+public:
     //shift-or mask for each character
     shiftor_mask_t shiftorMasks[1 << (8 + SUPER_BIT_NUM)];
     vector<string> patterns_in_each_bucket[BUCKET_NUM];
     int bucket_pattern_length[BUCKET_NUM];
 
-public:
+    Pigasus::Hashtable_bitmap *hashtable_bitmap_eachbucket[BUCKET_NUM]; //each bucket one bitmap
+
     explicit soengine(list<string>*, int groping_method = 0);
 
     void generate_shiftor_mask();
 
+    void generate_bitmap();
+
     /*匹配输入，未考虑性能优化*/
     void match(string *);
+
+    void co_match(string *);
 
     void debug();
 

@@ -1,6 +1,9 @@
 #include <iostream>
 #include <sys/time.h>
 #include <unistd.h>
+#include <fstream>
+#include <iomanip>
+#include <algorithm>
 #include "util.h"
 #include "soengine.h"
 
@@ -58,6 +61,43 @@ void parse_arguments(int argc, char** argv){
     printf("\n");
 }
 
+// 将字符串按长度分割
+std::vector<std::string> splitString(const std::string &str, size_t length) {
+    std::vector<std::string> result;
+    for (size_t i = 0; i < str.size(); i += length) {
+        //result.push_back(str.substr(i, length));
+        auto tmp_str = str.substr(i, length);
+        auto padding_str = tmp_str + std::string(length - tmp_str.length(), '0');
+
+        //reverse
+        std::reverse(padding_str.begin(), padding_str.end());
+
+        result.push_back(padding_str);
+    }
+    return result;
+}
+
+// 将字符串分割成长度为32的子串，并以十六进制格式写入文件
+void simulation_string2memory(const std::string &str, size_t length = 32) {
+    std::string filename = "./tbmatch.txt";
+    std::ofstream outfile(filename);
+    if (!outfile.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+    std::vector<std::string> substrings = splitString(str, length);
+    for (const auto &substr : substrings) {
+        for (const auto &ch : substr) {
+            //outfile << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(ch) << " ";
+            outfile << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(ch);
+        }
+        outfile << std::endl;
+    }
+
+    outfile.close();
+}
+
 int main(int argc, char** argv) {
     list<string>* patterns = nullptr;
     struct timeval begin, end;
@@ -85,7 +125,9 @@ int main(int argc, char** argv) {
     if(command.traffic_file){
         //string* T = read_traffic_from_pcap(command.traffic_file);
         string* T = read_text_from_file(command.traffic_file);
-        matching_engine->match(T);
+        simulation_string2memory(*T);
+        //matching_engine->match(T);
+        matching_engine->co_match(T);
     }
 
     return 0;
