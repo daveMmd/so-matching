@@ -4,9 +4,12 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include <map>
 
 #ifndef SO_MATCHING_PIGASUS_HASH_BITMAP_H
 #define SO_MATCHING_PIGASUS_HASH_BITMAP_H
+
+#define INVALID_RULEID 0xffff
 namespace Pigasus{
     typedef struct {
         uint32_t ab_n[4]; //[23:0]
@@ -30,9 +33,13 @@ namespace Pigasus{
         int MEM_SIZE;
         int BM_AWIDTH;
         uint8_t *rom;
+        uint16_t *hashtable_addr2ruleID;
+        int addr2rule_map_size;
         int LSB_BYTES_MASKED;
 
-        Hashtable_bitmap(int _NBITS, int _DWIDTH, int _MEM_SIZE, int _LSB_BYTES_MASKED){
+        std::map<std::string, uint16_t > *fastPatternToRuleIDMap;
+
+        Hashtable_bitmap(int _NBITS, int _DWIDTH, int _MEM_SIZE, int _LSB_BYTES_MASKED, int _addr2rule_map_size){
             NBITS = _NBITS;
             DWIDTH = _DWIDTH;
             MEM_SIZE = _MEM_SIZE;
@@ -40,6 +47,11 @@ namespace Pigasus{
             BM_AWIDTH = NBITS - 3;
 
             rom = new uint8_t[MEM_SIZE];
+
+            addr2rule_map_size = _addr2rule_map_size;
+            hashtable_addr2ruleID = new uint16_t[addr2rule_map_size];
+            for(int i = 0; i < addr2rule_map_size; i++)
+                hashtable_addr2ruleID[i] = INVALID_RULEID;
         }
 
         Hashtable_bimap_res lookup(uint32_t addr0, uint32_t addr1);
@@ -48,9 +60,15 @@ namespace Pigasus{
 
         void build(const std::vector<std::string>& patterns);
 
+        uint16_t findRuleID(std::string pattern);
+
         uint32_t dave_hash(std::string txt); //code by reverse analysis
 
-        void output_mif(std::string fname);
+        void output_mif(std::string fname_bitmap, std::string fname_hashtable);
+
+        void bitmap_mif_write(std::string fname);
+
+        void hashtable_mif_write(std::string fname);
     };
 }
 

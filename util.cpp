@@ -6,6 +6,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <vector>
+#include <regex>
 
 /*check if all chars are hex digits*/
 bool is_exact_string(string &pattern){
@@ -34,6 +36,45 @@ string hextostr(string &hex_pattern){
         pattern.push_back(c);
     }
     return pattern;
+}
+
+std::vector<SnortRule> parseSnortRules(const std::string &filename) {
+    std::vector<SnortRule> rules;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return rules;
+    }
+
+    std::string line;
+    std::regex ruleIDRegex(R"(sid:\s*(\d+);)");
+    std::regex fastPatternRegex(R"(fast_pattern:\s*\"(.*?)\")");
+
+    while (std::getline(file, line)) {
+        std::smatch match;
+        SnortRule rule;
+
+        // 提取 ruleID
+        if (std::regex_search(line, match, ruleIDRegex) && match.size() > 1) {
+            rule.ruleID = std::stoi(match.str(1));
+        }
+
+        // 提取 fast_pattern
+        if (std::regex_search(line, match, fastPatternRegex) && match.size() > 1) {
+            rule.fastPattern = match.str(1);
+        }
+
+        if (!rule.fastPattern.empty()) {
+            rules.push_back(rule);
+        }
+    }
+
+    file.close();
+    return rules;
+}
+
+vector<SnortRule> read_snortrules_from_file(char* fname){
+    return parseSnortRules(fname);
 }
 
 list<string>* read_patterns_from_clamav_ndb(char* fname, int max_pattern_num){

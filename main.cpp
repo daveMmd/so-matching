@@ -103,13 +103,12 @@ int main(int argc, char** argv) {
     struct timeval begin, end;
 
     parse_arguments(argc, argv);
-    //if(command.rule_format == nullptr || strcmp(command.rule_format, "clamav") == 0) patterns = read_patterns_from_clamav_ndb(command.pattern_file, command.max_pattern_num);
-    if(strcmp(command.rule_format, "clamav") == 0) patterns = read_patterns_from_clamav_ndb(command.pattern_file, command.max_pattern_num);
-    else if(strcmp(command.rule_format, "hyperscan") == 0) patterns = read_patterns_from_hyperscan_hex(command.pattern_file, command.max_pattern_num);
-    else patterns = read_patterns_from_plaintext(command.pattern_file, command.max_pattern_num);
+
+    auto rules = read_snortrules_from_file(command.pattern_file);
 
     gettimeofday(&begin, nullptr);
-    auto matching_engine = new soengine(patterns, command.grouping_method);
+    //auto matching_engine = new soengine(patterns, command.grouping_method);
+    auto matching_engine = new soengine(rules);
     gettimeofday(&end, nullptr);
     double diff_seconds = (end.tv_sec - begin.tv_sec) + 0.000001 * (end.tv_usec - begin.tv_usec);
     printf("shift-or enginge construction time: %lf seconds\n", diff_seconds);

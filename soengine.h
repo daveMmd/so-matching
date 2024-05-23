@@ -11,6 +11,8 @@
 #include <bitset>
 #include <vector>
 #include "pigasus_hash_bitmap.h"
+#include "util.h"
+
 using namespace std;
 
 /*DEBUG FLAG*/
@@ -35,9 +37,15 @@ public:
     vector<string> patterns_in_each_bucket[BUCKET_NUM];
     int bucket_pattern_length[BUCKET_NUM];
 
+    std::map<std::string, uint16_t > fastPatternToRuleIDMap;
+
     Pigasus::Hashtable_bitmap *hashtable_bitmap_eachbucket[BUCKET_NUM]; //each bucket one bitmap
 
     explicit soengine(list<string>*, int groping_method = 0);
+
+    void record_pattern_sid_map(vector<SnortRule> &rules);
+
+    explicit soengine(vector<SnortRule>);
 
     void generate_shiftor_mask();
 

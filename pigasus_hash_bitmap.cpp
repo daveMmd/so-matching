@@ -205,6 +205,13 @@ uint32_t acc_hash(uint64_t ANDMSK, int NBITS, std::vector<std::vector<uint32_t>>
         for(auto pattern : patterns){
             //calculate aibj / msk_aibj
             auto addr = dave_hash(pattern);
+            //record rule addr
+            if(hashtable_addr2ruleID[addr] != INVALID_RULEID){
+                fprintf(stderr, "hashtable_addr2ruleID conflicts!\n");
+                exit(-1);
+            }
+            hashtable_addr2ruleID[addr] = findRuleID(pattern);
+
             uint32_t rom_addr = (addr >> 3);
             uint8_t  bm_addr = addr % (1 << 3);
 
@@ -235,7 +242,23 @@ uint32_t acc_hash(uint64_t ANDMSK, int NBITS, std::vector<std::vector<uint32_t>>
         return if_match;
     }
 
-    void Hashtable_bitmap::output_mif(std::string fname) {
+    void Hashtable_bitmap::output_mif(std::string fname_bitmap, std::string fname_hashtable) {
+        bitmap_mif_write(fname_bitmap);
+
+        hashtable_mif_write(fname_hashtable);
+    }
+
+    uint16_t Hashtable_bitmap::findRuleID(std::string pattern) {
+        auto it = fastPatternToRuleIDMap->find(pattern);
+        if(it == fastPatternToRuleIDMap->end()){
+            fprintf(stderr, "error: not found pattern to sid!\n");
+            exit(-1);
+            return 0;
+        }
+        return (*it).second;
+    }
+
+    void Hashtable_bitmap::bitmap_mif_write(std::string fname) {
         std::ofstream mifFile(fname);
         if (!mifFile.is_open()) {
             std::cerr << "Failed to open file: " << fname << std::endl;
@@ -253,6 +276,31 @@ uint32_t acc_hash(uint64_t ANDMSK, int NBITS, std::vector<std::vector<uint32_t>>
         for (size_t i = 0; i < MEM_SIZE; ++i) {
             mifFile << "    " << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << i << " : "
                     << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << static_cast<int>(rom[i]) << ";\n";
+        }
+
+        mifFile << "END;\n";
+        mifFile.close();
+        std::cout << "MIF file written successfully to " << fname << std::endl;
+    }
+
+    void Hashtable_bitmap::hashtable_mif_write(std::string fname) {
+        std::ofstream mifFile(fname);
+        if (!mifFile.is_open()) {
+            std::cerr << "Failed to open file: " << fname << std::endl;
+            return;
+        }
+
+        // 写入 MIF 文件头
+        mifFile << "WIDTH=16;\n";
+        mifFile << "DEPTH=" << addr2rule_map_size << ";\n\n";
+        mifFile << "ADDRESS_RADIX=HEX;\n";
+        mifFile << "DATA_RADIX=HEX;\n\n";
+        mifFile << "CONTENT BEGIN\n";
+
+        // 写入数组内容
+        for (size_t i = 0; i < addr2rule_map_size; ++i) {
+            mifFile << "    " << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << i << " : "
+                    << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << static_cast<int>(hashtable_addr2ruleID[i]) << ";\n";
         }
 
         mifFile << "END;\n";

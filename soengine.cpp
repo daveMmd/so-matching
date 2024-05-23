@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <cassert>
+#include <map>
 
 bool lengthcmp(string &s1, string &s2){
     return s1.size() < s2.size();
@@ -646,7 +647,7 @@ void soengine::match(string *T) {
 void soengine::output_mif() {
     //call 8 hashtable_bitmap
     for(int bucket = 0; bucket < BUCKET_NUM; bucket++)
-        hashtable_bitmap_eachbucket[bucket]->output_mif("bitmap" + std::to_string(bucket) + ".mif");
+        hashtable_bitmap_eachbucket[bucket]->output_mif("bitmap" + std::to_string(bucket) + ".mif", "hashtable" + std::to_string(bucket) + ".mif");
 
     // 将数组写入 .mif 文件的函数
     string filename = "./match_table.mif";
@@ -682,13 +683,17 @@ void soengine::generate_bitmap() {
     for(auto bucket = 0; bucket < BUCKET_NUM; bucket++){
         //how many bytes should be masked when hashing
         int lsb_bytes_masked = (8 - bucket_pattern_length[7- bucket]);
-        if(bucket < 2) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(15, 16, 4096, lsb_bytes_masked);
-        else if(bucket < 4) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(12, 16, 512, lsb_bytes_masked);
-        else if(bucket == 4) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(11, 16, 256, lsb_bytes_masked);
-        else if(bucket == 5) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(12, 16, 512, lsb_bytes_masked);
-        else if(bucket == 6) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(10, 16, 128, lsb_bytes_masked);
-        else if(bucket == 7) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(8, 16, 32, lsb_bytes_masked);
+        if(bucket < 2) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(15, 16, 4096, lsb_bytes_masked, 32768);
+        else if(bucket < 4) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(12, 16, 512, lsb_bytes_masked, 4096);
+        else if(bucket == 4) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(11, 16, 256, lsb_bytes_masked, 2048);
+        else if(bucket == 5) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(12, 16, 512, lsb_bytes_masked, 4096);
+        else if(bucket == 6) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(10, 16, 128, lsb_bytes_masked, 1024);
+        else if(bucket == 7) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(8, 16, 32, lsb_bytes_masked, 256);
     }
+
+    //pass map to each bucket Hash_bitmap
+    for(int i = 0; i < 8; i++)
+        hashtable_bitmap_eachbucket[i]->fastPatternToRuleIDMap = &fastPatternToRuleIDMap;
 
     for(auto bucket = 0; bucket < BUCKET_NUM; bucket++){
         hashtable_bitmap_eachbucket[bucket]->build(patterns_in_each_bucket[7 - bucket]);
@@ -711,4 +716,54 @@ void soengine::co_match(string *T){
         }
     }
 
+}
+
+void soengine::record_pattern_sid_map(vector<SnortRule> &rules){
+    //std::map<std::string, uint16_t > fastPatternToRuleIDMap;
+    for (const auto &rule : rules) {
+        if (!rule.fastPattern.empty()) {
+            fastPatternToRuleIDMap[rule.fastPattern] = rule.ruleID;
+        }
+    }
+}
+
+void cut_pattern_length(vector<SnortRule>& rules){
+
+    for(auto& rule: rules){
+        auto pattern = rule.fastPattern;
+        string cut_pattern;
+        if(pattern.size() > MAX_PATTERN_LENGTH)
+        {
+            if(!CUT_DIRECTION) cut_pattern = string(pattern, 0, MAX_PATTERN_LENGTH);
+            else cut_pattern = string(pattern, pattern.length() - MAX_PATTERN_LENGTH, MAX_PATTERN_LENGTH);
+            rule.fastPattern = cut_pattern;
+        }
+        //else cut_pattern = pattern;
+    }
+}
+
+soengine::soengine(vector<SnortRule> rules) {
+
+    cut_pattern_length(rules);
+
+    record_pattern_sid_map(rules);
+
+    vector<string> patterns;
+    for(auto rule : rules){
+        patterns.push_back(rule.fastPattern);
+    }
+
+    //vector<string> *cut_patterns = cut_length(&patterns);
+
+    //pattern grouping
+
+    printf("Using Pigasus fixed-length grouping method!\n");
+
+    pigasus_grouping(&patterns, patterns_in_each_bucket, bucket_pattern_length);
+
+
+    //generate shift-or masks for each character
+    generate_shiftor_mask();
+
+    generate_bitmap();
 }
