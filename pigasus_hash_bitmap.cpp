@@ -206,11 +206,13 @@ uint32_t acc_hash(uint64_t ANDMSK, int NBITS, std::vector<std::vector<uint32_t>>
             //calculate aibj / msk_aibj
             auto addr = dave_hash(pattern);
             //record rule addr
-            if(hashtable_addr2ruleID[addr] != INVALID_RULEID){
-                fprintf(stderr, "hashtable_addr2ruleID conflicts!\n");
-                exit(-1);
+            if(fastPatternToRuleIDMap != nullptr){ //only FSPM record
+                if(hashtable_addr2ruleID[addr] != INVALID_RULEID){
+                    fprintf(stderr, "hashtable_addr2ruleID conflicts!\n");
+                    exit(-1);
+                }
+                hashtable_addr2ruleID[addr] = findRuleID(pattern);
             }
-            hashtable_addr2ruleID[addr] = findRuleID(pattern);
 
             uint32_t rom_addr = (addr >> 3);
             uint8_t  bm_addr = addr % (1 << 3);
@@ -249,11 +251,14 @@ uint32_t acc_hash(uint64_t ANDMSK, int NBITS, std::vector<std::vector<uint32_t>>
     }
 
     uint16_t Hashtable_bitmap::findRuleID(std::string pattern) {
+        //NFPSM
+        if(fastPatternToRuleIDMap == nullptr) return 0;
+
         auto it = fastPatternToRuleIDMap->find(pattern);
         if(it == fastPatternToRuleIDMap->end()){
+            //return 0; //NFPM no need to record ruleid...
             fprintf(stderr, "error: not found pattern to sid!\n");
             exit(-1);
-            return 0;
         }
         return (*it).second;
     }

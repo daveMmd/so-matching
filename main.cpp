@@ -57,7 +57,7 @@ void parse_arguments(int argc, char** argv){
     if(command.rule_format == nullptr) printf("use clamav format rule.\n");
     else printf("use %s format rule.\n", command.rule_format);
 
-    printf("Super charactrer bit num:%d\n", SUPER_BIT_NUM);
+    //printf("Super charactrer bit num:%d\n", SUPER_BIT_NUM);
     printf("\n");
 }
 
@@ -78,8 +78,8 @@ std::vector<std::string> splitString(const std::string &str, size_t length) {
 }
 
 // 将字符串分割成长度为32的子串，并以十六进制格式写入文件
-void simulation_string2memory(const std::string &str, size_t length = 32) {
-    std::string filename = "./tbmatch.txt";
+void simulation_string2memory(const std::string &str, size_t length = 32, string filename = "./tbmatch.txt") {
+    //std::string filename = "./tbmatch.txt";
     std::ofstream outfile(filename);
     if (!outfile.is_open()) {
         std::cerr << "Failed to open file: " << filename << std::endl;
@@ -107,26 +107,23 @@ int main(int argc, char** argv) {
     auto rules = read_snortrules_from_file(command.pattern_file);
 
     gettimeofday(&begin, nullptr);
-    //auto matching_engine = new soengine(patterns, command.grouping_method);
-    auto matching_engine = new soengine(rules);
+    auto matching_engine = new soengine(rules, 5);
+    auto matching_engine_NFPSM = new soengine(rules, 6,false);
     gettimeofday(&end, nullptr);
     double diff_seconds = (end.tv_sec - begin.tv_sec) + 0.000001 * (end.tv_usec - begin.tv_usec);
     printf("shift-or enginge construction time: %lf seconds\n", diff_seconds);
 
-    //matching_engine->debug();
-
-    //matching_engine->filtering_effectiveness();
-
-    //matching_engine->show_duplicate_patterns_in_same_bucket();
 
     matching_engine->output_mif();
+    matching_engine_NFPSM->output_mif();
 
     if(command.traffic_file){
         //string* T = read_traffic_from_pcap(command.traffic_file);
         string* T = read_text_from_file(command.traffic_file);
         simulation_string2memory(*T);
-        //matching_engine->match(T);
+        simulation_string2memory(*T, 64, "tbpacket.txt");
         matching_engine->co_match(T);
+        matching_engine_NFPSM->co_match(T);
     }
 
     return 0;

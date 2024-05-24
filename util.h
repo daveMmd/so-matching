@@ -15,6 +15,7 @@ using namespace std;
 typedef struct {
     std::string fastPattern;
     uint16_t    ruleID;
+    std::vector<std::string> shortPatterns;
 }SnortRule;
 
 list<string>* read_patterns_from_clamav_ndb(char* fname, int max_pattern_num);

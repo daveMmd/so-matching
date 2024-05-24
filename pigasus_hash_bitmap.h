@@ -39,10 +39,10 @@ namespace Pigasus{
 
         std::map<std::string, uint16_t > *fastPatternToRuleIDMap;
 
-        Hashtable_bitmap(int _NBITS, int _DWIDTH, int _MEM_SIZE, int _LSB_BYTES_MASKED, int _addr2rule_map_size){
+        Hashtable_bitmap(int _NBITS, int _DWIDTH, int _LSB_BYTES_MASKED, int _addr2rule_map_size){
             NBITS = _NBITS;
             DWIDTH = _DWIDTH;
-            MEM_SIZE = _MEM_SIZE;
+            MEM_SIZE = (1 << (NBITS - 3));
             LSB_BYTES_MASKED = _LSB_BYTES_MASKED;
             BM_AWIDTH = NBITS - 3;
 

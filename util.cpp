@@ -8,6 +8,7 @@
 #include <sstream>
 #include <vector>
 #include <regex>
+#include <set>
 
 /*check if all chars are hex digits*/
 bool is_exact_string(string &pattern){
@@ -73,8 +74,103 @@ std::vector<SnortRule> parseSnortRules(const std::string &filename) {
     return rules;
 }
 
+// 将十六进制字符串转换为字符
+std::string hexToString(const std::string& hex) {
+    std::string result;
+    std::istringstream hexStream(hex);
+    std::string byte;
+
+    while (hexStream >> byte) {
+        char ch = static_cast<char>(std::stoi(byte, nullptr, 16));
+        result += ch;
+    }
+
+    return result;
+}
+
+// 转换包含十六进制标识的字符串
+std::string convertHexInString(const std::string& input) {
+    std::regex hexPattern(R"(\|([0-9A-Fa-f\s]+)\|)");
+    std::string result = input;
+    std::smatch match;
+
+    // 迭代查找并替换所有匹配的十六进制标识
+    while (std::regex_search(result, match, hexPattern)) {
+        std::string hexString = match.str(1); // 提取十六进制部分
+        std::string asciiString = hexToString(hexString); // 转换为ASCII字符
+        result.replace(match.position(0), match.length(0), asciiString); // 替换原始匹配部分
+    }
+
+    return result;
+}
+
+std::vector<SnortRule> parseSnortRules_full(const std::string &filename) {
+    std::vector<SnortRule> rules;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return rules;
+    }
+
+    std::string line;
+    std::regex ruleIDRegex(R"(sid:\s*(\d+);)");
+    //std::regex fastPatternRegex(R"(fast_pattern:\s*\"(.*?)\")");
+    //std::regex fastPatternRegex(R"(content:\s*\"(.*?)\"\s*,.*fast_pattern.*?;)");
+    std::regex fastPatternRegex(R"(content:\s*\"([^\"]*?)\"[^;]*,[^;]*?fast_pattern[^;]*?;)");
+    std::regex shortPatternRegex(R"(content:\s*\"(.*?)\".*?;)");
+
+    int compress_sid = 1;
+    std::set<string> fastPattern_set = {};
+    while (std::getline(file, line)) {
+        std::smatch match;
+        SnortRule rule;
+
+        // 提取 ruleID
+        if (std::regex_search(line, match, ruleIDRegex) && match.size() > 1) {
+            rule.ruleID = std::stoi(match.str(1));
+            rule.ruleID = compress_sid++;
+        }
+
+        // 提取 fast_pattern
+        if (std::regex_search(line, match, fastPatternRegex) && match.size() > 1) {
+            std::string content = match.str(1);
+            auto nohex_content = convertHexInString(content);
+            if(nohex_content.size() < 2){
+                cerr << "error: fast_pattern size < 2" <<endl;
+                exit(-1);
+            }
+            if(fastPattern_set.find(nohex_content) != fastPattern_set.end()){
+                //fprintf(stderr, "error: same fast_pattern :%s", nohex_content);
+                cerr << "error: same fast_pattern :" << nohex_content << endl;
+                exit(-1);
+            }
+            fastPattern_set.insert(nohex_content);
+            rule.fastPattern = nohex_content;
+        }
+
+        // 提取 shortPatterns
+        auto shortPatternBegin = std::sregex_iterator(line.begin(), line.end(), shortPatternRegex);
+        auto shortPatternEnd = std::sregex_iterator();
+
+        for (std::sregex_iterator i = shortPatternBegin; i != shortPatternEnd; ++i) {
+            std::smatch match = *i;
+            std::string content = match.str(1);
+            auto nohex_content = convertHexInString(content);
+            if(nohex_content.size() < 2) continue;
+            if(content != rule.fastPattern) rule.shortPatterns.push_back(nohex_content);
+        }
+
+        if (!rule.fastPattern.empty()) {
+            rules.push_back(rule);
+        }
+    }
+
+    file.close();
+    return rules;
+}
+
 vector<SnortRule> read_snortrules_from_file(char* fname){
-    return parseSnortRules(fname);
+    return parseSnortRules_full(fname);
 }
 
 list<string>* read_patterns_from_clamav_ndb(char* fname, int max_pattern_num){

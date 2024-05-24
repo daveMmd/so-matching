@@ -19,7 +19,8 @@ using namespace std;
 #define DEBUG_MATCHING_CASES 0
 #define PATTERN_GROUPING 3 //3: pigasus 方法; 2：局部搜索划分；1:用hypersan的动态规划方法划分规则集； 0:平均划分；
 
-#define SUPER_BIT_NUM 5//4
+#define SUPER_BIT_NUM 5//FPSM 为 5, 但是 NFPSM 为6....
+
 //#define SUPER_BIT_NUM 2
 #define BUCKET_NUM 8
 //#define BUCKET_NUM 32
@@ -33,7 +34,11 @@ typedef bitset<2 * MAX_PATTERN_LENGTH * BUCKET_NUM> so_mask_t;//用于匹配过�
 class soengine {
 public:
     //shift-or mask for each character
-    shiftor_mask_t shiftorMasks[1 << (8 + SUPER_BIT_NUM)];
+    int super_bit_num;
+    bool fpsm_or_nfpsm{true};
+    //shiftor_mask_t shiftorMasks[1 << (8 + SUPER_BIT_NUM)];
+    shiftor_mask_t *shiftorMasks;
+
     vector<string> patterns_in_each_bucket[BUCKET_NUM];
     int bucket_pattern_length[BUCKET_NUM];
 
@@ -45,11 +50,13 @@ public:
 
     void record_pattern_sid_map(vector<SnortRule> &rules);
 
-    explicit soengine(vector<SnortRule>);
+    explicit soengine(vector<SnortRule>, int _super_bit_num, bool fpsm_or_nfpsm = true); //fpsm_or_nfpsm: true(FPSM), false (NFPSM)
 
     void generate_shiftor_mask();
 
     void generate_bitmap();
+
+    void generate_fingerprints(vector<SnortRule> &rules);
 
     /*匹配输入，未考虑性能优化*/
     void match(string *);
