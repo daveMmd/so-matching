@@ -113,7 +113,7 @@ void my_grouping(vector<string> *patterns, vector<string>* patterns_in_each_buck
 //Pigasus fixed-length grouping:
 //pigasus first-filter state 初始值为[63:0] : 0000000000000011000001110000111100011111001111110111111111111111
 //-> pigasus 每个bucket长度为固定的: 2, 3, 4, 5, 6, 7, 8, 8
-void pigasus_grouping(vector<string> *patterns, vector<string>* patterns_in_each_bucket, int* bucket_pattern_length){
+void pigasus_grouping(vector<string> *patterns, vector<string>* patterns_in_each_bucket, int* bucket_pattern_length, bool is_FPSM = true){
     bucket_pattern_length[0] = 2;
     bucket_pattern_length[1] = 3;
     bucket_pattern_length[2] = 4;
@@ -122,18 +122,31 @@ void pigasus_grouping(vector<string> *patterns, vector<string>* patterns_in_each
     bucket_pattern_length[5] = 7;
     bucket_pattern_length[6] = 8;
     bucket_pattern_length[7] = 8;
+    if(!is_FPSM){
+        for(int i = 0; i < 7; i++) bucket_pattern_length[i]--;
+    }
     int cnt_len8 = 0;
     for(const auto& pattern :*patterns){
         auto pattern_len = pattern.size();
+        if(pattern_len == 1 && !is_FPSM){
+            patterns_in_each_bucket[0].push_back(pattern);
+            continue;
+        }
         assert(pattern_len >= 2 && pattern_len <= 8);
         if(pattern_len < 8){
             auto bucket_choose = pattern_len - 2;
+            if(!is_FPSM) bucket_choose++;
             patterns_in_each_bucket[bucket_choose].push_back(pattern);
         }
         else{//pattern_len == 8
             //average place to bucket 6,7
-            auto bucket_choose = 6 + (cnt_len8++) % 2;
-            patterns_in_each_bucket[bucket_choose].push_back(pattern);
+            if(is_FPSM){
+                auto bucket_choose = 6 + (cnt_len8++) % 2;
+                patterns_in_each_bucket[bucket_choose].push_back(pattern);
+            }
+            else{//NFPSM:
+                patterns_in_each_bucket[7].push_back(pattern);
+            }
         }
     }
 }
@@ -824,7 +837,7 @@ soengine::soengine(vector<SnortRule> rules, int _super_bit_num, bool _fpsm_or_nf
     //pattern grouping
     printf("Using Pigasus fixed-length grouping method!\n");
 
-    pigasus_grouping(&patterns, patterns_in_each_bucket, bucket_pattern_length);
+    pigasus_grouping(&patterns, patterns_in_each_bucket, bucket_pattern_length, fpsm_or_nfpsm);
 
 
     //generate shift-or masks for each character
