@@ -70,7 +70,7 @@ std::vector<std::string> splitString(const std::string &str, size_t length) {
         auto padding_str = tmp_str + std::string(length - tmp_str.length(), '0');
 
         //reverse
-        std::reverse(padding_str.begin(), padding_str.end());
+        //std::reverse(padding_str.begin(), padding_str.end());
 
         result.push_back(padding_str);
     }
@@ -121,8 +121,8 @@ int main(int argc, char** argv) {
         //string* T = read_traffic_from_pcap(command.traffic_file);
         string* T = read_text_from_file(command.traffic_file);
         simulation_string2memory(*T);
-        simulation_string2memory(*T, 64, "tbpacket.txt");
-        matching_engine->co_match(T);
+        simulation_string2memory(*T, 16, "tbpacket.txt");
+        //matching_engine->co_match(T);
         matching_engine_NFPSM->co_match(T);
     }
 

@@ -576,7 +576,7 @@ void soengine::match(string *T) {
             //int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
             int index = ((c2 % (1 << super_bit_num)) << 8) + c1;
             so_masks[i].reset(); //初始化为全0
-            //cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
+            cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
             //so_masks[i] = shiftorMasks[index];
             for(int length = 0; length < MAX_PATTERN_LENGTH; length++){
                 for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
@@ -622,6 +622,7 @@ void soengine::match(string *T) {
         unsigned char c2 = Text[pos + i + 1]; //可能超出边界
         //int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
         int index = ((c2 % (1 << super_bit_num)) << 8) + c1;
+        cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
         so_masks[i].reset(); //初始化为全0
         //so_masks[i] = shiftorMasks[index];
         for(int length = 0; length < MAX_PATTERN_LENGTH; length++){
@@ -722,9 +723,13 @@ void soengine::generate_bitmap() {
             else if(bucket == 7) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(8, 16, lsb_bytes_masked, 256);
         }
         else{ //NFPSM
+            /*
             int lsb_bytes_masked = (8 - bucket_pattern_length[7- bucket]);
-            if(bucket >= 1) lsb_bytes_masked++; //8,7,6,5,4,3,2,1   previous: 8,8,7,6,5,4,3,2
+            //if(bucket >= 1) lsb_bytes_masked++; //8,7,6,5,4,3,2,1   previous: 8,8,7,6,5,4,3,2
+            if((7 - bucket) >= 1) lsb_bytes_masked++; //8,7,6,5,4,3,2,1   previous: 8,8,7,6,5,4,3,2*/
+            int lsb_bytes_masked = bucket;// 0, 1, 2, 3, 4, 5, 6, 7
 
+            //printf("hashtable bitmap , bucket : %d, lsb_bytes_masked: %d\n", bucket, lsb_bytes_masked);
             if(bucket == 0) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(17, 16, lsb_bytes_masked, 1);
             else if(bucket == 1) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(13, 16, lsb_bytes_masked, 1);
             else if(bucket == 2) hashtable_bitmap_eachbucket[bucket] = new Pigasus::Hashtable_bitmap(13, 16, lsb_bytes_masked, 1);
@@ -761,6 +766,7 @@ void soengine::co_match(string *T){
         int char_n = (i >= 7) ? 8 : (i + 1);
         string sub_str = T->substr(start_pos, char_n);
         for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
+            //printf("bucket: %d, pos: %d\n", bucket, i);
             bool if_match = hashtable_bitmap_eachbucket[bucket]->lookup(sub_str);
             if(if_match){
                 printf("Pigasus-hash-bitmap (bucket %d) matched at pos: %d\n", (7 - bucket), i);

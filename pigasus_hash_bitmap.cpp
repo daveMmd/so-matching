@@ -229,6 +229,8 @@ uint32_t acc_hash(uint64_t ANDMSK, int NBITS, std::vector<std::vector<uint32_t>>
     bool Hashtable_bitmap::lookup(std::string txt) {
         auto addr = dave_hash(txt);
 
+        //printf("addr: %x\n", addr);
+
         uint32_t bm_addr = (addr >> 3) % (1 << (NBITS - 3));
         uint8_t  bm_bit = addr % (1 << 3);
 
