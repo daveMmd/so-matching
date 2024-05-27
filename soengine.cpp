@@ -576,7 +576,7 @@ void soengine::match(string *T) {
             //int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
             int index = ((c2 % (1 << super_bit_num)) << 8) + c1;
             so_masks[i].reset(); //初始化为全0
-            cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
+            //cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
             //so_masks[i] = shiftorMasks[index];
             for(int length = 0; length < MAX_PATTERN_LENGTH; length++){
                 for(int bucket = 0; bucket < BUCKET_NUM; bucket++){
@@ -622,7 +622,7 @@ void soengine::match(string *T) {
         unsigned char c2 = Text[pos + i + 1]; //可能超出边界
         //int index =  c1 * (1 << SUPER_BIT_NUM) + c2 % (1 << SUPER_BIT_NUM);
         int index = ((c2 % (1 << super_bit_num)) << 8) + c1;
-        cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
+        //cout << "index: " << std::hex << index << " so-mask[]: " << shiftorMasks[index].to_string() << endl;
         so_masks[i].reset(); //初始化为全0
         //so_masks[i] = shiftorMasks[index];
         for(int length = 0; length < MAX_PATTERN_LENGTH; length++){
